@@ -5,3 +5,16 @@ psycopg2-binary~=2.9.9
 python-multipart~=0.0.9
 pydantic~=2.6.1
 alembic~=1.13.1
+
+# Authentication
+python-jose[cryptography]~=3.3.0
+passlib[bcrypt]~=1.7.4
+
+# Firebase Authentication
+firebase-admin~=6.5.0
+
+# HTTP client for SMS providers
+requests~=2.31.0
+
+# Optional: Twilio SDK for SMS
+# twilio~=8.10.0

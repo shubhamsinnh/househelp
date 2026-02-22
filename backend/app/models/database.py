@@ -6,16 +6,18 @@ Think of each class below as a "table" in a spreadsheet.
 
 Tables:
 -------
-1. User     - The employer/family who is looking for help.
-2. Worker   - The domestic worker (maid, cook, driver, etc.).
-3. Unlock   - A record of every time a user PAID to see a worker's phone number.
+1. User       - The employer/family who is looking for help.
+2. Worker     - The domestic worker (maid, cook, driver, etc.).
+3. Unlock     - A record of every time a user PAID to see a worker's phone number.
 4. BGVRequest - A record of every Background Verification request.
-5. Review   - Ratings and feedback left by employers after hiring.
+5. Review     - Ratings and feedback left by employers after hiring.
+6. OTPCode    - Temporary OTP codes for phone verification.
+7. Favorite   - Saved/bookmarked workers by users.
 """
 
 from typing import Optional
 from sqlmodel import Field, SQLModel
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 # ---------------------------------------------------------------------------
@@ -29,9 +31,12 @@ class User(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     phone: str = Field(unique=True, index=True)       # Indian mobile number
+    firebase_uid: Optional[str] = Field(default=None, unique=True, index=True)  # Firebase user ID (for auth migration)
     name: Optional[str] = None                          # Optional display name
     city: Optional[str] = None                          # e.g., "Lucknow"
-    role: str = Field(default="employer")               # "employer" or "admin"
+    role: str = Field(default="employer")               # "employer", "worker", or "admin"
+    is_worker: bool = Field(default=False)              # True if this user is also a worker
+    worker_id: Optional[int] = Field(default=None, foreign_key="workers.id")  # Link to worker profile
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -60,6 +65,9 @@ class Worker(SQLModel, table=True):
     rating_avg: Optional[float] = Field(default=0.0)   # Average star rating
     rating_count: int = Field(default=0)                # Total number of reviews
     is_active: bool = Field(default=True)               # Can be deactivated by admin
+    is_available: bool = Field(default=True)            # Worker availability toggle
+    available_from: Optional[str] = None                # e.g., "09:00" (24hr format)
+    available_to: Optional[str] = None                  # e.g., "18:00" (24hr format)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -124,3 +132,44 @@ class Review(SQLModel, table=True):
     comment: Optional[str] = None                       # Optional text review
     tags: Optional[str] = None                          # e.g., "punctual,honest,good_cooking"
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# TABLE 6: OTP Codes (Phone Verification)
+# ---------------------------------------------------------------------------
+# Temporary codes sent via SMS for phone number verification.
+# Each code expires after 5 minutes. Rate limited to 3 per 10 minutes.
+# ---------------------------------------------------------------------------
+class OTPCode(SQLModel, table=True):
+    __tablename__ = "otp_codes"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    phone: str = Field(index=True)                       # Phone number receiving OTP
+    code: str                                             # 6-digit OTP code
+    expires_at: datetime                                  # When this OTP expires
+    verified: bool = Field(default=False)                 # Has this OTP been used?
+    attempts: int = Field(default=0)                      # Failed verification attempts
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    @classmethod
+    def generate_expiry(cls) -> datetime:
+        """OTP expires 5 minutes from now."""
+        return datetime.utcnow() + timedelta(minutes=5)
+
+
+# ---------------------------------------------------------------------------
+# TABLE 7: Favorites (Saved Workers)
+# ---------------------------------------------------------------------------
+# Users can bookmark workers they're interested in for later.
+# ---------------------------------------------------------------------------
+class Favorite(SQLModel, table=True):
+    __tablename__ = "favorites"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    worker_id: int = Field(foreign_key="workers.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        # Ensure unique constraint on (user_id, worker_id) pair
+        pass
