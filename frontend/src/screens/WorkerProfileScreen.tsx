@@ -24,7 +24,7 @@ import {
     Linking,
 } from "react-native";
 import { COLORS, SPACING, RADIUS, PRICING } from "../constants/theme";
-import { getWorkerProfile, unlockContact, Worker } from "../services/api";
+import { getWorkerProfile, unlockContact, checkUnlockStatus, Worker } from "../services/api";
 
 export default function WorkerProfileScreen({ route, navigation }: any) {
     const { workerId } = route.params;
@@ -41,6 +41,12 @@ export default function WorkerProfileScreen({ route, navigation }: any) {
         try {
             const data = await getWorkerProfile(workerId);
             setWorker(data);
+
+            // Check if user already unlocked this worker
+            const phone = await checkUnlockStatus(workerId);
+            if (phone) {
+                setUnlockedPhone(phone);
+            }
         } catch (err) {
             Alert.alert("Error", "Could not load profile.");
         } finally {
@@ -61,8 +67,10 @@ export default function WorkerProfileScreen({ route, navigation }: any) {
                             setUnlocking(true);
                             // In production, this would first trigger Razorpay SDK
                             // and pass the real payment_id from the callback.
+                            // In production, this would first trigger Razorpay SDK
+                            // and pass the real payment_id from the callback.
                             const mockPaymentId = "pay_mock_" + Date.now();
-                            const result = await unlockContact(1, workerId, mockPaymentId);
+                            const result = await unlockContact(workerId, mockPaymentId);
                             setUnlockedPhone(result.real_phone_number);
                             Alert.alert("✅ Unlocked!", `You can now call ${result.worker_name}.`);
                         } catch (err) {
