@@ -17,6 +17,12 @@ __pycache__/
 .env
 .env.local
 
+# Database files (local dev only — never push to git)
+*.db
+
+# Claude/AI config
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
